@@ -9,6 +9,7 @@
 #include <ie_blob_stream.hpp>
 #include <ie_profiling.hpp>
 #include <ie_reader.hpp>
+#include <ie_ir_version.hpp>
 
 #include <fstream>
 #include <istream>
@@ -37,7 +38,6 @@ public:
  * @brief This class is a wrapper for reader interfaces
  */
 class Reader: public IReader {
-private:
     InferenceEngine::details::SOPointer<IReader> ptr;
     std::once_flag readFlag;
     std::string name;
@@ -120,11 +120,34 @@ void registerReaders() {
         readers.emplace("prototxt", onnxReader);
     }
 
-    // try to load IR reader if library exists
-    auto irReader = create_if_exists("IR", std::string("inference_engine_ir_reader") + std::string(IE_BUILD_POSTFIX));
-    if (irReader)
-        readers.emplace("xml", irReader);
+    // try to load IR reader v10 if library exists
+    auto irReaderv10 = create_if_exists("IRv10", std::string("inference_engine_ir_reader") + std::string(IE_BUILD_POSTFIX));
+    if (irReaderv10)
+        readers.emplace("xml", irReaderv10);
+
+    // try to load IR reader v7 if library exists
+    auto irReaderv7 = create_if_exists("IRv7", std::string("inference_engine_ir_v7_reader") + std::string(IE_BUILD_POSTFIX));
+    if (irReaderv7)
+        readers.emplace("xml", irReaderv7);
+
     initialized = true;
+}
+
+void assertIfIRv7LikeModel(std::istream & modelStream) {
+    auto irVersion = details::GetIRVersion(modelStream);
+    bool isIRv7 = irVersion > 1 && irVersion <= 7;
+
+    if (!isIRv7)
+        return;
+
+    for (auto && kvp : readers) {
+        Reader::Ptr reader = kvp.second;
+        if (reader->getName() == "IRv7") {
+            return;
+        }
+    }
+
+    THROW_IE_EXCEPTION << "IR v" << irVersion << " is deprecated. Please, migrate to IR v10 version";
 }
 
 }  // namespace
@@ -144,6 +167,8 @@ CNNNetwork details::ReadNetwork(const std::string& modelPath, const std::string&
     std::ifstream modelStream(model_path, std::ios::binary);
     if (!modelStream.is_open())
         THROW_IE_EXCEPTION << "Model file " << modelPath << " cannot be opened!";
+
+    assertIfIRv7LikeModel(modelStream);
 
     // Find reader for model extension
     auto fileExt = modelPath.substr(modelPath.find_last_of(".") + 1);
@@ -197,6 +222,8 @@ CNNNetwork details::ReadNetwork(const std::string& model, const Blob::CPtr& weig
     registerReaders();
     std::istringstream modelStream(model);
     details::BlobStream binStream(weights);
+
+    assertIfIRv7LikeModel(modelStream);
 
     for (auto it = readers.begin(); it != readers.end(); it++) {
         auto reader = it->second;

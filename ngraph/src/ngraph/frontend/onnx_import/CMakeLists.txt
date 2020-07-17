@@ -14,7 +14,7 @@
 # limitations under the License.
 # ******************************************************************************
 
-set(ONNX_OPSET_VERSION 11 CACHE INTERNAL "Supported version of ONNX operator set")
+set(ONNX_OPSET_VERSION 13 CACHE INTERNAL "Supported version of ONNX operator set")
 
 add_library(onnx_importer SHARED
         core/node.cpp
@@ -78,8 +78,8 @@ add_library(onnx_importer SHARED
         op/constant_of_shape.hpp
         op/conv.cpp
         op/conv.hpp
-        op/conv_integer.cpp
-        op/conv_integer.hpp
+        # op/conv_integer.cpp
+        # op/conv_integer.hpp
         op/conv_transpose.cpp
         op/conv_transpose.hpp
         op/cum_sum.cpp
@@ -99,12 +99,14 @@ add_library(onnx_importer SHARED
         op/expand.cpp
         op/eye_like.cpp
         op/eye_like.hpp
+        op/fake_quantize.cpp
+        op/fake_quantize.hpp
         op/flatten.cpp
         op/flatten.hpp
         op/floor.hpp
         op/gather.hpp
-        op/gather_nd.hpp
-        op/gather_nd.cpp
+        # op/gather_nd.hpp
+        # op/gather_nd.cpp
         op/gemm.cpp
         op/gemm.hpp
         op/global_average_pool.cpp
@@ -119,6 +121,7 @@ add_library(onnx_importer SHARED
         op/hardmax.cpp
         op/hardmax.hpp
         op/identity.hpp
+        op/image_scaler.cpp
         op/instance_norm.cpp
         op/instance_norm.hpp
         op/leaky_relu.cpp
@@ -168,8 +171,8 @@ add_library(onnx_importer SHARED
         op/prelu.hpp
         op/qlinear_matmul.cpp
         op/qlinear_matmul.hpp
-        op/quant_conv.cpp
-        op/quant_conv.hpp
+        # op/quant_conv.cpp
+        # op/quant_conv.hpp
         op/quantize_linear.cpp
         op/quantize_linear.hpp
         op/range.cpp
@@ -189,10 +192,10 @@ add_library(onnx_importer SHARED
         op/rnn.hpp
         op/roi_align.cpp
         op/roi_align.hpp
-        op/round.cpp
-        op/round.hpp
-        op/scatter_nd.cpp
-        op/scatter_nd.hpp
+        # op/round.cpp
+        # op/round.hpp
+        # op/scatter_nd.cpp
+        # op/scatter_nd.hpp
         op/scatter_elements.cpp
         op/scatter_elements.hpp
         op/selu.cpp
@@ -263,8 +266,8 @@ add_library(onnx_importer SHARED
 
 set(ONNX_IMPORT_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR} CACHE INTERNAL "")
 
-target_link_libraries(onnx_importer PRIVATE onnx onnx_proto)
-target_link_libraries(onnx_importer PUBLIC  ngraph)
+target_link_libraries(onnx_importer PRIVATE onnx onnx_proto ${Protobuf_LIBRARIES})
+target_link_libraries(onnx_importer PUBLIC ngraph)
 
 set_target_properties(onnx_importer PROPERTIES
                       CXX_VISIBILITY_PRESET hidden
@@ -274,9 +277,13 @@ set_target_properties(onnx_importer PROPERTIES
 target_include_directories(onnx_importer SYSTEM PUBLIC $<BUILD_INTERFACE:${ONNX_IMPORT_INCLUDE_DIR}>
                                                        $<INSTALL_INTERFACE:include/ngraph/frontend/onnx_import>)
 target_include_directories(onnx_importer SYSTEM PRIVATE ${NGRAPH_INCLUDE_PATH}
-        ${ONNX_INCLUDE_DIR} ${ONNX_PROTO_INCLUDE_DIR} ${Protobuf_INCLUDE_DIR})
+        ${ONNX_INCLUDE_DIR} ${ONNX_PROTO_INCLUDE_DIR} ${Protobuf_INCLUDE_DIRS})
 
 target_compile_definitions(onnx_importer PRIVATE ONNX_OPSET_VERSION=${ONNX_OPSET_VERSION})
+
+if(NGRAPH_USE_PROTOBUF_LITE)
+    target_compile_definitions(onnx_importer PRIVATE NGRAPH_USE_PROTOBUF_LITE)
+endif()
 
 if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "^(Apple)?Clang$")
     target_compile_options(onnx_importer PRIVATE -Wno-undef -Wno-reserved-id-macro -Wno-switch-enum
